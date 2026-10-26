@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Data Analytics Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header class="header">
+        <div>
+            <h1>YouTube Analytics</h1>
+            <p>Data Wrangling and Visualization Dashboard</p>
+        </div>
+        <span class="badge">DWP Mini Project</span>
+    </header>
+
+    <main class="container">
+
+        <section class="panel">
+            <h2>Upload Your Dataset</h2>
+            <p>Upload a CSV file containing YouTube channel statistics.</p>
+
+            <div class="upload-area">
+                <input type="file" id="csvFile" accept=".csv">
+                <button id="analyzeBtn">Analyze Data</button>
+                <button id="sampleBtn" class="secondary">Load Sample Data</button>
+            </div>
+
+            <p id="status" role="status">Upload a CSV file to get started.</p>
+        </section>
+
+        <section class="stats-grid">
+            <div class="stat-card">
+                <p>Total Records</p>
+                <h2 id="totalRecords">0</h2>
+            </div>
+
+            <div class="stat-card">
+                <p>Unique Channels</p>
+                <h2 id="totalChannels">0</h2>
+            </div>
+
+            <div class="stat-card">
+                <p>Total Views</p>
+                <h2 id="totalViews">0</h2>
+            </div>
+
+            <div class="stat-card">
+                <p>Missing Values</p>
+                <h2 id="missingValues">0</h2>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>Data Wrangling Summary</h2>
+            <div id="cleaningSummary">
+                Upload a dataset to see the cleaning results.
+            </div>
+            <button id="downloadBtn" class="secondary" disabled>
+                Download Cleaned CSV
+            </button>
+        </section>
+
+        <section class="charts-grid">
+
+            <div class="chart-card">
+                <h3>Monthly Subscriber Growth</h3>
+                <canvas id="subscriberChart"></canvas>
+            </div>
+
+            <div class="chart-card">
+                <h3>Channel-wise Subscribers</h3>
+                <canvas id="channelChart"></canvas>
+            </div>
+
+            <div class="chart-card">
+                <h3>Views vs Likes</h3>
+                <canvas id="scatterChart"></canvas>
+            </div>
+
+            <div class="chart-card">
+                <h3>Views Distribution — Histogram</h3>
+                <div id="histogramChart"></div>
+            </div>
+
+        </section>
+
+        <section class="panel">
+            <h2>Cleaned Data Preview</h2>
+            <p>The first 10 rows of the processed dataset are shown below.</p>
+
+            <div class="table-container">
+                <table>
+                    <thead id="tableHead"></thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <footer>
+        <p>YouTube Data Analytics | Data Wrangling and Preprocessing Mini Project</p>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-3.0.1.min.js"></script>
+    <script src="app.js"></script>
+
+</body>
+</html>
