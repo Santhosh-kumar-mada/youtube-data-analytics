@@ -19,199 +19,95 @@ const requiredColumns = [
     "Likes"
 ];
 
-// Check if the required columns exist
-function validateColumns(rows) {
-    if (!rows.length) {
-        throw new Error("The CSV file is empty.");
-    }
-
-    const columns = Object.keys(rows[0]);
-
-    const missingColumns = requiredColumns.filter(
-        column => !columns.includes(column)
-    );
-
-    if (missingColumns.length) {
-        throw new Error(
-            "Missing columns: " + missingColumns.join(", ")
-        );
-    }
+function getSummaryInfo(summary = {}) {
+    return {
+        originalCount: Number(summary.original_count ?? summary.originalCount ?? 0),
+        missingCount: Number(summary.missing_count ?? summary.missingCount ?? 0),
+        duplicateCount: Number(summary.duplicate_count ?? summary.duplicateCount ?? 0),
+        invalidRows: Number(summary.invalid_rows ?? summary.invalidRows ?? 0),
+        finalCount: Number(summary.final_count ?? summary.finalCount ?? 0)
+    };
 }
 
-// Read uploaded CSV file
-analyzeBtn.addEventListener("click", () => {
-    const file = fileInput.files[0];
-
+// Validate uploaded file in the browser before sending it to Python
+function validateUploadedFile(file) {
     if (!file) {
-        statusText.textContent = "Please select a CSV file first.";
-        return;
+        throw new Error("Please select a CSV file first.");
     }
 
     if (!file.name.toLowerCase().endsWith(".csv")) {
-        statusText.textContent = "Please upload a CSV file.";
-        return;
+        throw new Error("Please upload a CSV file.");
     }
 
     if (file.size > 5 * 1024 * 1024) {
-        statusText.textContent = "File must be smaller than 5 MB.";
-        return;
+        throw new Error("File must be smaller than 5 MB.");
+    }
+}
+
+async function sendFileToBackend(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch("/api/analyze", {
+        method: "POST",
+        body: formData
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(data.detail || "Unable to read this CSV file.");
     }
 
-    Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
+    return data;
+}
 
-        complete: function (result) {
-            try {
-                processData(result.data);
-            } catch (error) {
-                statusText.textContent = error.message;
-            }
-        },
-
-        error: function () {
-            statusText.textContent = "Unable to read this CSV file.";
-        }
-    });
-});
-
-// Load the sample CSV from the project folder
-sampleBtn.addEventListener("click", async () => {
+// Read uploaded CSV file
+analyzeBtn.addEventListener("click", async () => {
     try {
-        statusText.textContent = "Loading sample dataset...";
+        const file = fileInput.files[0];
+        validateUploadedFile(file);
+        statusText.textContent = "Sending CSV to Python for cleaning...";
 
-        const response = await fetch(
-            "data/sample_youtube_data.csv"
-        );
-
-        if (!response.ok) {
-            throw new Error(
-                "Sample file not found. Use Live Server or upload a CSV."
-            );
-        }
-
-        const csvText = await response.text();
-
-        Papa.parse(csvText, {
-            header: true,
-            skipEmptyLines: true,
-
-            complete: function (result) {
-                try {
-                    processData(result.data);
-                } catch (error) {
-                    statusText.textContent = error.message;
-                }
-            }
-        });
+        const result = await sendFileToBackend(file);
+        processData(result.rows || [], result.summary || {});
     } catch (error) {
         statusText.textContent = error.message;
     }
 });
 
-// Clean and process the dataset
-function processData(rows) {
-    validateColumns(rows);
+async function loadSampleFromBackend() {
+    const response = await fetch("/api/sample");
+    const data = await response.json().catch(() => ({}));
 
-    const originalCount = rows.length;
+    if (!response.ok) {
+        throw new Error(data.detail || "Sample file not found. Use Live Server or upload a CSV.");
+    }
 
-    // Count missing cells before cleaning
-    let missingCount = 0;
+    return data;
+}
 
-    rows.forEach(row => {
-        requiredColumns.forEach(column => {
-            if (
-                row[column] === undefined ||
-                row[column] === null ||
-                String(row[column]).trim() === ""
-            ) {
-                missingCount++;
-            }
-        });
-    });
+// Load the sample CSV from the project folder
+sampleBtn.addEventListener("click", async () => {
+    try {
+        statusText.textContent = "Loading sample dataset...";
+        const result = await loadSampleFromBackend();
+        processData(result.rows || [], result.summary || {});
+    } catch (error) {
+        statusText.textContent = error.message;
+    }
+});
 
-    // Remove completely empty rows
-    let data = rows.filter(row =>
-        requiredColumns.some(
-            column => String(row[column] ?? "").trim() !== ""
-        )
-    );
-
-    // Standardize text and convert numeric columns
-    data = data.map(row => {
-        const cleaned = {};
-
-        cleaned.Channel = String(row.Channel ?? "").trim();
-        cleaned.Month = String(row.Month ?? "").trim();
-
-        ["Subscribers", "Views", "Likes"].forEach(column => {
-            const value = String(row[column] ?? "").trim();
-            const number = Number(value);
-
-            cleaned[column] =
-                value !== "" && Number.isFinite(number)
-                    ? number
-                    : null;
-        });
-
-        return cleaned;
-    });
-
-    // Remove records without essential identifying information
-    data = data.filter(row =>
-        row.Channel !== "" && row.Month !== ""
-    );
-
-    // Identify invalid numeric values
-    const invalidRows = data.filter(row =>
-        ["Subscribers", "Views", "Likes"].some(column =>
-            row[column] === null || row[column] < 0
-        )
-    ).length;
-
-    // Replace missing or negative numeric values with zero.
-    // This is a simple demo strategy, not suitable for every dataset.
-    data = data.map(row => {
-        ["Subscribers", "Views", "Likes"].forEach(column => {
-            if (row[column] === null || row[column] < 0) {
-                row[column] = 0;
-            }
-        });
-
-        return row;
-    });
-
-    // Remove exact duplicate records
-    const beforeDuplicates = data.length;
-
-    const uniqueData = [];
-    const seen = new Set();
-
-    data.forEach(row => {
-        const key = JSON.stringify(row);
-
-        if (!seen.has(key)) {
-            seen.add(key);
-            uniqueData.push(row);
-        }
-    });
-
-    const duplicateCount = beforeDuplicates - uniqueData.length;
-
-    cleanedData = uniqueData;
+// Clean and process the dataset returned by Python
+function processData(rows, summary = {}) {
+    const info = getSummaryInfo(summary);
+    cleanedData = Array.isArray(rows) ? rows : [];
 
     if (!cleanedData.length) {
         throw new Error("No valid records remain after cleaning.");
     }
 
-    // Update dashboard
-    updateSummary({
-        originalCount,
-        missingCount,
-        duplicateCount,
-        invalidRows
-    });
-
+    updateSummary(info);
     updateCharts();
     updateTable();
 
@@ -229,7 +125,7 @@ function updateSummary(info) {
     )];
 
     const totalViews = cleanedData.reduce(
-        (sum, row) => sum + row.Views,
+        (sum, row) => sum + Number(row.Views || 0),
         0
     );
 
@@ -332,7 +228,7 @@ function updateCharts() {
         );
 
         return Math.max(
-            ...channelRows.map(row => row.Subscribers)
+            ...channelRows.map(row => Number(row.Subscribers || 0))
         );
     });
 
@@ -379,8 +275,8 @@ function updateCharts() {
                 data: cleanedData
                     .filter(row => row.Channel === channel)
                     .map(row => ({
-                        x: row.Views,
-                        y: row.Likes
+                        x: Number(row.Views || 0),
+                        y: Number(row.Likes || 0)
                     }))
             }))
         },
@@ -424,7 +320,7 @@ function updateCharts() {
         "histogramChart",
 
         [{
-            x: cleanedData.map(row => row.Views),
+            x: cleanedData.map(row => Number(row.Views || 0)),
             type: "histogram",
             nbinsx: 10
         }],

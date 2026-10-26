@@ -2,3 +2,6 @@ pandas
 matplotlib
 seaborn
 jupyter
+fastapi
+uvicorn[standard]
+python-multipart
